@@ -96,7 +96,7 @@ def add_time(start, duration, day):
     total_dur_hours = dur_hour + extra_hour
     while i <= total_dur_hours:
         if (11 - start_hour < total_dur_hours and i == 0) or (start_min + dur_min >= 60 and i == 0):
-            if min_and_am_or_pm[1] == 'AM':  # convert from AM to PM
+            if min_and_am_or_pm[1] == 'AM' and total_dur_hours >= 12 - start_hour:  # convert from AM to PM
                 min_and_am_or_pm[1] = "PM"  # lists are mutable, so it is okay to change an element in the list "min_and_am_or_pm"
             else:
                 min_and_am_or_pm[1] = 'AM'  # keep the same meridiem value
