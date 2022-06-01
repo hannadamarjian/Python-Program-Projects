@@ -1,0 +1,355 @@
+Problem 0 - Importing the packages using !pip and then the data:
+
+!pip install numpy seaborn scipy statsmodels matplotlib ipython jupyter sympy nose sklearn model_selection ensemble
+
+# Import the person_level_data.csv file:
+
+import pandas as pd
+
+person = pd.read_csv('C:/Users/johnd.LAPTOP-35N364TU/OneDrive/Desktop/Applied Data Scientist CS/ads_exam_data/ads_exam_data/person.csv')
+
+# Print the first five rows:
+person.head(5)
+
+# Import the house.csv file:
+
+house = pd.read_csv('C:/Users/johnd.LAPTOP-35N364TU/OneDrive/Desktop/Applied Data Scientist CS/ads_exam_data/ads_exam_data/house.csv')
+
+# Print the first five rows:
+house.head(10)
+
+# What is the dimension (rows, columns) for each data set?
+person.shape # object.method
+
+house.shape
+
+# Frequency table of missing values for each feature:
+person.isnull().sum()
+
+# Verify data types:
+person.dtypes
+
+
+# --------------------------------------------------------------------------------
+
+Problem 1 - Exploratory Data Analysis:
+
+Part A. Calculate the average weekly hours worked among men and women:
+
+# What do the values for the SEX column look like?
+person['sex'].value_counts()
+person['sex'].nunique()
+
+# Here, I use some basic programming to create a new column 
+# that has the cleaned sex values:
+
+sex_clean = [] # create an empty list
+
+for gender in person['sex']:
+    if gender == 'M' or gender == "MALE" or gender == "male":
+        sex_clean.append('Male')
+    else:
+        sex_clean.append('Female')
+        
+person['sex_clean'] = sex_clean # sex_column is now added to the existing dataframe.
+
+person.head(5)
+
+# Average weekly hours worked for each gender:
+person.pivot_table('weekly_hours_worked', index=['sex_clean'], aggfunc=['mean'])
+
+
+
+
+Part B. List the three households (i.e. household_ids) with the highest per person incomes:
+
+# Frequency table of missing values for each feature:
+house.isnull().sum()
+
+# Create a new dataframe and empty lists (which will be the columns of the new dataframe):
+avg_income = pd.DataFrame()
+house_id = []
+income = []
+person_count = []
+
+
+# Record each ID only once:
+for ID in house['household_id']:
+    if ID not in house_id:
+        house_id.append(ID)
+
+# Create new columns called "person_count" and "income":         
+for i in range(len(house)):    
+    if house.iat[i, 1] == 'hh_size':
+        person_count.append(house.iat[i, 2])
+    elif house.iat[i, 1] == 'hh_income':
+        income.append(house.iat[i, 2])
+    else:
+        continue
+
+# Store these new columns in the dataframe "avg_income":
+avg_income['household_id'] = house_id
+avg_income['income'] = income
+avg_income['person_count'] = person_count
+avg_income['average_income'] = round(avg_income['income']/avg_income['person_count'],2)
+
+
+
+# Rank the average income per person in descending order:
+avg_income_ranked = avg_income.sort_values(by='average_income', ascending=False)
+avg_income_ranked.head(5)
+
+
+Part C. List the three individuals (i.e. person_ids) with the highest personal income, and the dollar amounts of their personal incomes.
+
+person['total_income_per_person'] = person['hh_income_pct']*avg_income['income']
+person_total_income_ranked = person.sort_values(by='total_income_per_person', ascending=False)
+person_total_income_ranked.head(3)
+
+person_total_income_ranked.isnull().sum()
+
+len(person['hh_income_pct']) - len(avg_income['income'])
+
+
+
+Part D. Calculate the 80th percentile of age among people in each of the five marital categories
+
+import numpy as np
+
+def my80(g):
+    return np.percentile(g, 80)
+
+person.pivot_table('age', index='marital_status', aggfunc=[my80])
+
+
+# -----------------------------------------------------------------------------------------------
+
+Problem 2 - Does there exist a linear relationship between total income and age when accounting for the insurance status?
+
+# We use the train dataset:
+import pandas as pd
+
+train = pd.read_csv('C:/Users/johnd.LAPTOP-35N364TU/OneDrive\\Desktop/Applied Data Scientist CS/ads_exam_data/ads_exam_data/train.csv')
+train.head(5)
+
+# Suppose the missing values are denoted as NaN. Any missing values?
+train.isnull().sum()
+
+
+train.describe()
+# Scale total_income when building the model in Problem 3.
+
+
+import matplotlib.pyplot as plt
+plt.scatter(x=train['age'], y=train['total_income'], c=train['uninsured'])
+plt.title("Total Income vs Age based on Insurance Status")
+plt.legend(['Insured', 'Uninsured'])
+plt.xlabel("Age")
+plt.ylabel("Total Income")
+plt.show()
+
+
+# -----------------------------------------------------------------------------------
+
+Problem 3: Build a predictive model to classify whether one has insurance or not?
+
+
+train = pd.read_csv('C:/Users/johnd.LAPTOP-35N364TU/OneDrive\\Desktop/Applied Data Scientist CS/ads_exam_data/ads_exam_data/train.csv')
+train.head(5)
+
+train.dtypes
+
+# 1. Explore the continuous features:
+
+train_numeric = train[['uninsured', 'age', 'weekly_hours_worked', 'total_income', 'self_employed_income', 'wage_income', 'interest_income', 'other_income']]
+train_numeric.head(5)
+
+# Analyze the general distribution of these features:
+train_numeric.describe()
+
+# Analyze the correlation between the target and each continuous variable:
+train_numeric.corr()
+
+# Performed a two-sample t-test for two groups (insured vs uninsured) FOR EACH continuous variable:
+import scipy as sp
+from scipy import stats
+
+def describe_cont_feature(feature):
+    print('\\n*** Results for {} ***'.format(feature))
+    print(train_numeric.groupby('uninsured')[feature].describe())
+    print(ttest(feature))
+    
+    
+def ttest(feature):
+    uninsured = train_numeric[train_numeric['uninsured']==1][feature]
+    insured = train_numeric[train_numeric['uninsured']==0][feature]
+    tstat, pval = sp.stats.ttest_ind(uninsured, insured, equal_var = False)
+    print('t-statistic: {:.1f}, p-value: {:.3}'.format(tstat,pval))
+    
+    
+# Look at the distribution of each feature at each level of the target variable
+
+for feature in ['age', 'weekly_hours_worked', 'total_income', 'self_employed_income', 'wage_income', 'interest_income', 'other_income']:
+    describe_cont_feature(feature)
+    
+
+
+I will only consider age and total_income as my continuous metrics for the model.
+
+
+# 2. Explore categorical (labeled) data against uninsured variable:
+train_num = train[['age', 'weekly_hours_worked', 'total_income', 'self_employed_income', 'wage_income', 'interest_income', 'other_income']]
+train_categ = train.drop(train_num, axis=1)
+train_categ.head(10)
+
+# Check the count of levels for each feature:
+for col in train_categ.columns:
+    print('{}: {} unique values'.format(col, train_categ[col].nunique()))
+    
+for cat_var in ['citizen_status', 'nativity_status', 'marital_status', 'school_status','when_last_worked', 'worked_last_week', 'race_native_american', 'race_asian', 'race_black', 'race_native_hawaiian', 'race_pacific_islander', 'race_white', 'race_other']:
+    print(train_categ.groupby(cat_var)['uninsured'].mean())
+    
+# Analyze insurance status by language:
+train_categ.pivot_table('uninsured', index='language', aggfunc='mean')
+
+import seaborn as sns
+
+# Create categorical plots:
+for col in ['citizen_status', 'nativity_status', 'marital_status', 'school_status','when_last_worked', 'worked_last_week', 'race_native_american', 'race_asian', 'race_black', 'race_native_hawaiian', 'race_pacific_islander', 'race_white', 'race_other']:
+    sns.catplot(x=col, y='uninsured', data=train_categ, kind = 'point', aspect = 2, )
+    
+
+
+I want to use the citizen_status, nativity_status, race_white, and race_other as my categorical features.
+
+
+# 3. Convert the categorical variables citizen_status and nativity_status to numeric features
+
+from sklearn.preprocessing import LabelEncoder
+
+for feature in ['citizen_status', 'nativity_status']:
+    le = LabelEncoder()
+    train[feature] = le.fit_transform(train[feature].astype(str))
+train.head(5)
+
+# 4. Outlier detection for total_income:
+
+sns.displot(train['total_income'], kde=False)
+plt.title('Histogram for Total Income')
+plt.ylim(0, 3000)
+plt.show()
+
+import numpy as np
+
+def detect_outlier(feature):
+    outliers = []
+    data = train[feature]
+    mean = np.mean(data)
+    std = np.std(data)
+
+    for y in data:
+        z_score = (y - mean)/std
+        if np.abs(z_score) > 3:
+           outliers.append(y)
+        print('\\nOutlier caps for {}:'.format(feature))
+        print('  --95p: {:.1f} / {} values exceed that'.format(data.quantile(0.95), len([i for i in data if i > data.quantile(0.95)])))
+        print('  --3sd: {:.1f} / {} values exceed that'.format(mean + 3*(std), len(outliers)))
+        print('  --99p: {:.1f} / {} values exceed that'.format(data.quantile(0.99), len([i for i in data if i > data.quantile(0.99)])))
+
+detect_outlier('total_income')
+
+# Dropped top 1% of values.
+train.describe()
+
+
+# 5. Set total_income to follow a standard normal distribution by applying Box-Cox transf.:
+
+import scipy.stats
+for i in [2, 3, 4, 5, 6, 7, 8]:
+    data_t = train['total_income']**(1/i)
+    n, bins, patches = plt.hist(data_t, 50, density=True)
+    mu = np.mean(data_t)
+    sigma = np.std(data_t)
+    plt.plot(bins, scipy.stats.norm.pdf(bins, mu, sigma))
+    plt.title('Transformation: 1/{}'.format(str(i)))
+    plt.show()
+    
+train['total_income_cleaned_tr'] = train['total_income'].apply(lambda x: x**(1/4))
+
+
+# 6. Prepare features for modeling:
+
+from sklearn.model_selection import train_test_split
+train_cleaned = pd.read_csv('C:/Users/johnd.LAPTOP-35N364TU/OneDrive/Desktop/Applied Data Scientist CS/ads_exam_data/train_cleaned.csv')
+train_cleaned.head(5)
+
+train_features = train_cleaned[['age','total_income_cleaned_tr', 'citizen_status', 'race_white', 'race_other']]
+labels = train_cleaned['uninsured']
+train_features.corr()
+
+
+# Split by 70% train and 30% test:
+X_train, X_test, y_train, y_test = train_test_split(train_features, labels, test_size=0.4)
+
+from sklearn.linear_model import LogisticRegression
+# Create an object named "model" from the class LogisticRegression():
+
+model = LogisticRegression()
+model.fit(X_train, y_train)
+model.predict(X_test)
+model.score(X_test, y_test) # accuracy is about 92% on testing data
+model.predict_proba(X_test)
+
+insured_prob_train = []
+for i in range(len(model.predict_proba(X_test))):
+    insured_prob_train.append(model.predict_proba(X_test)[i][0])
+print(round(insured_prob_train,4))
+
+# 7. Apply the cleaning and/or scaling from these features to the unlabeled.csv dataset:
+
+import pandas as pd
+unlabeled = pd.read_csv('C:/Users/johnd.LAPTOP-35N364TU/OneDrive/Desktop/Applied Data Scientist CS/ads_exam_data/ads_exam_data/unlabeled_data.csv')
+unlabeled.head(5)
+len(unlabeled) # There are 20,172 observations
+
+def detect_outlier(feature):
+    outliers = []
+    data = unlabeled[feature]
+    mean = np.mean(data)
+    std = np.std(data)
+
+    for y in data:
+        z_score = (y - mean)/std
+        if np.abs(z_score) > 3:
+           outliers.append(y)
+        print('\\nOutlier caps for {}:'.format(feature))
+        print('  --95p: {:.1f} / {} values exceed that'.format(data.quantile(0.95), len([i for i in data if i > data.quantile(0.95)])))
+        print('  --3sd: {:.1f} / {} values exceed that'.format(mean + 3*(std), len(outliers)))
+        print('  --99p: {:.1f} / {} values exceed that'.format(data.quantile(0.99), len([i for i in data if i > data.quantile(0.99)])))
+
+detect_outlier('total_income')
+
+# Dropped top 1% of values.
+unlabeled['total_income'].clip(upper=unlabeled['total_income'].quantile(.99), inplace = True)
+
+
+# Create the new transformed feature for total_income (skewed so we want it to be more compact); I chose i = 4:
+unlabeled['total_income_cleaned_tr'] = unlabeled['total_income'].apply(lambda x: x**(1/4))
+unlabeled.head(5)
+
+# Convert categorical feature, citizen_status, to numeric levels:
+le = LabelEncoder()
+
+# Only citizen_status because nativity_status is highly correlated with citizen_status and citizen_status does a better job at predicting insurance status.
+unlabeled['citizen_status'] = le.fit_transform(unlabeled['citizen_status'].astype(str))
+
+unlabeled_cleaned = unlabeled[['person_id','age', 'total_income_cleaned_tr', 'citizen_status', 'race_white', 'race_other']]
+
+unlabeled_cleaned.corr()
+model.predict_proba(unlabeled_cleaned)
+
+unlabeled_cleaned['score'] = insured_prob_unlabeled
+part3_scores = unlabeled_cleaned[['person_id', 'score']]
+part3_scores.head(5)
+
+part3_scores.to_csv('C:/Users/johnd.LAPTOP-35N364TU/OneDrive/Desktop/Applied Data Scientist CS/ads_exam_data/part3_scores.csv', index = False)
